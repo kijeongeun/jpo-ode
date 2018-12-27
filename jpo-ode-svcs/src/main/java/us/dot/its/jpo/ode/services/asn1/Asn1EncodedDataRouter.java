@@ -1,6 +1,22 @@
+/*******************************************************************************
+ * Copyright 2018 572682
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License.  You may obtain a copy
+ * of the License at
+ * 
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ ******************************************************************************/
 package us.dot.its.jpo.ode.services.asn1;
 
 import java.util.HashMap;
+import java.util.Map;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -25,7 +41,13 @@ import us.dot.its.jpo.ode.wrapper.MessageProducer;
 
 public class Asn1EncodedDataRouter extends AbstractSubscriberProcessor<String, String> {
 
-   public static class Asn1EncodedDataRouterException extends Exception {
+   private static final String BYTES = "bytes";
+
+  private static final String MESSAGE_FRAME = "MessageFrame";
+
+  private static final String ERROR_ON_DDS_DEPOSIT = "Error on DDS deposit.";
+
+  public static class Asn1EncodedDataRouterException extends Exception {
 
       private static final long serialVersionUID = 1L;
 
@@ -35,7 +57,7 @@ public class Asn1EncodedDataRouter extends AbstractSubscriberProcessor<String, S
 
    }
 
-   private Logger logger = LoggerFactory.getLogger(this.getClass());
+   private static final Logger logger = LoggerFactory.getLogger(Asn1EncodedDataRouter.class);
 
    private OdeProperties odeProperties;
    private MessageProducer<String, String> stringMsgProducer;
@@ -76,19 +98,18 @@ public class Asn1EncodedDataRouter extends AbstractSubscriberProcessor<String, S
             if (request.has(TimDepositController.RSUS_STRING)) {
                JSONObject rsusIn = (JSONObject) request.get(TimDepositController.RSUS_STRING);
                if (rsusIn.has(TimDepositController.RSUS_STRING)) {
-                 Object rsu_ = rsusIn.get(TimDepositController.RSUS_STRING);
+                 Object rsu = rsusIn.get(TimDepositController.RSUS_STRING);
                  JSONArray rsusOut = new JSONArray();
-                 if (rsu_ instanceof JSONArray) {
+                 if (rsu instanceof JSONArray) {
                    logger.debug("Multiple RSUs exist in the request: {}", request);
-                   JSONArray rsusInArray = (JSONArray) rsu_;
+                   JSONArray rsusInArray = (JSONArray) rsu;
                    for (int i = 0; i < rsusInArray.length(); i++) {
-                     JSONObject rsu = (JSONObject) rsusInArray.get(i);
-                     rsusOut.put(rsu);
+                     rsusOut.put(rsusInArray.get(i));
                    }
                    request.put(TimDepositController.RSUS_STRING, rsusOut);
-                 } else if (rsu_ instanceof JSONObject) {
+                 } else if (rsu instanceof JSONObject) {
                    logger.debug("Single RSU exists in the request: {}", request);
-                   rsusOut.put(rsu_);
+                   rsusOut.put(rsu);
                    request.put(TimDepositController.RSUS_STRING, rsusOut);
                  } else {
                    logger.debug("No RSUs exist in the request: {}", request);
@@ -131,8 +152,7 @@ public class Asn1EncodedDataRouter extends AbstractSubscriberProcessor<String, S
       return serviceRequest;
    }
 
-   public void processEncodedTim(ServiceRequest request, JSONObject consumedObj)
-         throws Asn1EncodedDataRouterException {
+   public void processEncodedTim(ServiceRequest request, JSONObject consumedObj) {
 
       JSONObject dataObj = consumedObj.getJSONObject(AppContext.PAYLOAD_STRING).getJSONObject(AppContext.DATA_STRING);
 
@@ -155,10 +175,10 @@ public class Asn1EncodedDataRouter extends AbstractSubscriberProcessor<String, S
          // Cases 1 & 2
          // Sign and send to RSUs
 
-         JSONObject mfObj = dataObj.getJSONObject("MessageFrame");
+         JSONObject mfObj = dataObj.getJSONObject(MESSAGE_FRAME);
 
-         String hexEncodedTim = mfObj.getString("bytes");
-         logger.debug("Encoded message: {}", hexEncodedTim);
+         String hexEncodedTim = mfObj.getString(BYTES);
+         logger.debug("Encoded message - phase 1: {}", hexEncodedTim);
 
          if (odeProperties.dataSigningEnabled()) {
             logger.debug("Sending message for signature!");
@@ -199,9 +219,11 @@ public class Asn1EncodedDataRouter extends AbstractSubscriberProcessor<String, S
             // Case 3
             JSONObject asdObj = dataObj.getJSONObject(Asn1CommandManager.ADVISORY_SITUATION_DATA_STRING);
             try {
-              asn1CommandManager.depositToDDS(asdObj.getString("bytes"));
+              asn1CommandManager.depositToDDS(asdObj.getString(BYTES));
             } catch (JSONException | Asn1CommandManagerException e) {
-              logger.error("Error on DDS deposit.", e);
+              String msg = ERROR_ON_DDS_DEPOSIT;
+              logger.error(msg, e);
+              EventLogger.logger.error(msg, e);
             }
          } else {
             logger.debug("Unsigned ASD received. Depositing it to SDW.");
@@ -211,7 +233,7 @@ public class Asn1EncodedDataRouter extends AbstractSubscriberProcessor<String, S
       }
    }
 
-   public void processEncodedTimUnsecured(ServiceRequest request, JSONObject consumedObj) throws Asn1EncodedDataRouterException {
+   public void processEncodedTimUnsecured(ServiceRequest request, JSONObject consumedObj) {
       // Send TIMs and record results
       HashMap<String, String> responseList = new HashMap<>();
 
@@ -228,7 +250,7 @@ public class Asn1EncodedDataRouter extends AbstractSubscriberProcessor<String, S
          }
 
         if (null != asdObj) {
-           String asdBytes = asdObj.getString("bytes");
+           String asdBytes = asdObj.getString(BYTES);
 
            // Deposit to DDS
            String ddsMessage = "";
@@ -238,33 +260,33 @@ public class Asn1EncodedDataRouter extends AbstractSubscriberProcessor<String, S
               logger.info("DDS deposit successful.");
            } catch (Exception e) {
               ddsMessage = "\"dds_deposit\":{\"success\":\"false\"}";
-              logger.error("Error on DDS deposit.", e);
+              String msg = ERROR_ON_DDS_DEPOSIT;
+              logger.error(msg, e);
+              EventLogger.logger.error(msg, e);
            }
 
            responseList.put("ddsMessage", ddsMessage);
-        } else {
-           String msg = "ASN.1 Encoder did not return ASD encoding {}";
-           EventLogger.logger.error(msg, consumedObj.toString());
-           logger.error(msg, consumedObj.toString());
+        } else if (logger.isErrorEnabled()) { // Added to avoid Sonar's "Invoke method(s) only conditionally." code smell
+          String msg = "ASN.1 Encoder did not return ASD encoding {}";
+          EventLogger.logger.error(msg, consumedObj.toString());
+          logger.error(msg, consumedObj.toString());
         }
       }
 
-      if (dataObj.has("MessageFrame")) {
-         JSONObject mfObj = dataObj.getJSONObject("MessageFrame");
-         String encodedTim = mfObj.getString("bytes");
-         logger.debug("Encoded message: {}", encodedTim);
+      if (dataObj.has(MESSAGE_FRAME)) {
+         JSONObject mfObj = dataObj.getJSONObject(MESSAGE_FRAME);
+         String encodedTim = mfObj.getString(BYTES);
+         logger.debug("Encoded message - phase 2: {}", encodedTim);
 
         // only send message to rsu if snmp, rsus, and message frame fields are present
         if (null != request.getSnmp() && null != request.getRsus() && null != encodedTim) {
-           logger.debug("Encoded message: {}", encodedTim);
-           HashMap<String, String> rsuResponseList =
+           logger.debug("Encoded message phase 3: {}", encodedTim);
+           Map<String, String> rsuResponseList =
                  asn1CommandManager.sendToRsus(request, encodedTim);
            responseList.putAll(rsuResponseList);
          }
       }
 
       logger.info("TIM deposit response {}", responseList);
-
-      return;
    }
 }

@@ -1,9 +1,22 @@
+/*******************************************************************************
+ * Copyright 2018 572682
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License.  You may obtain a copy
+ * of the License at
+ * 
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ ******************************************************************************/
 package us.dot.its.jpo.ode.traveler;
 
 import javax.xml.bind.DatatypeConverter;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.snmp4j.PDU;
 import org.snmp4j.ScopedPDU;
 import org.snmp4j.smi.Integer32;
@@ -22,8 +35,6 @@ import us.dot.its.jpo.ode.plugin.ServiceRequest.OdeInternal.RequestVerb;
  */
 public class TimPduCreator {
    
-   private static final Logger logger = LoggerFactory.getLogger(TimPduCreator.class);
-    
     public static class TimPduCreatorException extends Exception {
       private static final long serialVersionUID = 1L;
 
@@ -31,9 +42,9 @@ public class TimPduCreator {
          super(string, e);
       }
 
-   }
+    }
 
-   private TimPduCreator() {
+    private TimPduCreator() {
        throw new UnsupportedOperationException();
     }
     
@@ -103,7 +114,6 @@ public class TimPduCreator {
         
         return pdu;
       } catch (Exception e) {
-         logger.error("Exception creating PDU.", e);
          throw new TimPduCreatorException("Error creating PDU", e);
       }
     }

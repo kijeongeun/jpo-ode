@@ -1,3 +1,18 @@
+/*******************************************************************************
+ * Copyright 2018 572682
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License.  You may obtain a copy
+ * of the License at
+ * 
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ ******************************************************************************/
 package us.dot.its.jpo.ode.plugin.j2735.builders;
 
 import java.util.ArrayList;
@@ -48,7 +63,7 @@ public class EventDescriptionBuilder {
          for (int i = 0; i < headingSliceBits.length; i++) {
 
             String eventName = J2735HeadingSliceNames.values()[i].name();
-            Boolean eventStatus = (headingSliceBits[i] == '1' ? true : false);
+            Boolean eventStatus = (headingSliceBits[i] == '1');
             headingSlice.put(eventName, eventStatus);
 
          }
@@ -62,18 +77,15 @@ public class EventDescriptionBuilder {
       }
 
       JsonNode regional = description.get("regional");
-      if (regional != null) {
+      if (regional != null && regional.isArray()) {
+          Iterator<JsonNode> elements = regional.elements();
 
-         if (regional.isArray()) {
-            Iterator<JsonNode> elements = regional.elements();
+          while (elements.hasNext()) {
+             JsonNode element = elements.next();
 
-            while (elements.hasNext()) {
-               JsonNode element = elements.next();
-
-               desc.getRegional().add(new J2735RegionalContent().setId(element.get("regionId").asInt())
-                     .setValue(CodecUtils.fromHex(element.get("regExtValue").asText())));
-            }
-         }
+             desc.getRegional().add(new J2735RegionalContent().setId(element.get("regionId").asInt())
+                   .setValue(CodecUtils.fromHex(element.get("regExtValue").asText())));
+          }
       }
 
       return desc;
